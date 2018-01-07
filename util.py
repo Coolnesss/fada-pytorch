@@ -9,5 +9,8 @@ def eval_on_test(test_dataloader, model_fn):
     acc = 0
     for x, y in test_dataloader:
         x, y = Variable(x), Variable(y)
+
+        if torch.cuda.is_available():
+            x, y = x.cuda(), y.cuda()
         acc += accuracy(model_fn(x), y)
     return acc / float(len(test_dataloader))

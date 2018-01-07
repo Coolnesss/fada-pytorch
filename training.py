@@ -10,13 +10,17 @@ def model_fn(encoder, classifier):
     return lambda x: classifier(encoder(x))
 
 ''' Pretrain the encoder and classifier as in (a) in figure 2. '''
-def pretrain(epochs=15):
+def pretrain(epochs=5, cuda=False):
 
-    train_dataloader = mnist_dataloader()
-    test_dataloader = mnist_dataloader(train=False)
+    train_dataloader = mnist_dataloader(cuda=cuda)
+    test_dataloader = mnist_dataloader(train=False, cuda=cuda)
 
     classifier = Classifier()
     encoder = Encoder()
+
+    if cuda:
+        classifier.cuda()
+        encoder.cuda()
 
     ''' Jointly optimize both encoder and classifier ''' 
     optimizer = optim.Adam(list(encoder.parameters()) + list(classifier.parameters()))
@@ -30,6 +34,9 @@ def pretrain(epochs=15):
 
             x, y = Variable(x), Variable(y)
 
+            if cuda:
+                x, y = x.cuda(), y.cuda()
+
             y_pred = model_fn(encoder, classifier)(x)
 
             loss = loss_fn(y_pred, y)
@@ -39,4 +46,5 @@ def pretrain(epochs=15):
             optimizer.step()
 
         print("Epoch", e, "Loss", loss.data[0], "Accuracy", eval_on_test(test_dataloader, model_fn(encoder, classifier)))
-        
+    
+    return encoder, classifier
