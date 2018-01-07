@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from torch import optim
 from torch.autograd import Variable
-from data import mnist_dataloader
-from models import Classifier, Encoder
+from data import mnist_dataloader, svhn_dataloader
+from models import Classifier, Encoder, Discriminator
 from util import eval_on_test
 
 def model_fn(encoder, classifier):
@@ -48,3 +48,25 @@ def pretrain(epochs=5, cuda=False):
         print("Epoch", e, "Loss", loss.data[0], "Accuracy", eval_on_test(test_dataloader, model_fn(encoder, classifier)))
     
     return encoder, classifier
+
+''' Train the discriminator while the encoder is frozen '''
+def train_discriminator(encoder, cuda=False, batch_size=256, epochs=10):
+
+    source_loader = mnist_dataloader(train=True, cuda=cuda)
+    target_loader = svhn_dataloader(train=True, cuda=cuda)
+
+    discriminator = Discriminator()
+
+    optimizer = optim.Adam(discriminator.parameters())
+    #n_iters =  
+
+    if cuda:
+        discriminator.cuda()
+
+    for e in range(epochs):
+
+        source = iter(source_loader)
+        target = iter(target_loader)
+
+        for _ in range(n_iters):
+

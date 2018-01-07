@@ -13,4 +13,4 @@ def eval_on_test(test_dataloader, model_fn):
         if torch.cuda.is_available():
             x, y = x.cuda(), y.cuda()
         acc += accuracy(model_fn(x), y)
-    return acc / float(len(test_dataloader))
+    return round(acc / float(len(test_dataloader)), 3)
