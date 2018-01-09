@@ -7,6 +7,7 @@ Disclaimer: I'm not in any way affiliated with the authors. There might be error
 ### Todo
 
 * [x] Source-only training
-* [ ] Freeze g and train DCD
+* [x] Freeze g and train DCD
 * [ ] Freeze the DCD and train g, h
 * [ ] Comprehensive tests
+* [ ] More datasets to test on (currently only MNIST -> USPS)

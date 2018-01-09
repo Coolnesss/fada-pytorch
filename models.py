@@ -15,9 +15,9 @@ class DCD(nn.Module):
         self.out = nn.Linear(H, 4)
 
     def forward(self, x):
-        out = self.fc1(x)
-        out = F.relu(self.fc2(out))
-        return F.softmax(self.out(out), dim=0)
+        out = F.relu(self.fc1(x))
+        out = self.fc2(out)
+        return F.softmax(self.out(out), dim=1)
 
 ''' Called h in the paper. Gives class predictions based on the latent representation '''
 class Classifier(nn.Module):
