@@ -81,6 +81,9 @@ def train_discriminator(encoder, groups, n_target_samples=2, cuda=False, epochs=
             x1, x2 = groups[group][random.randint(0, len(groups[group]) - 1)]
             x1, x2 = Variable(x1), Variable(x2)
 
+            if cuda:
+                x1, x2 = x1.cuda(), x2.cuda()
+
             # Optimize the DCD using sample drawn
             optimizer.zero_grad()
 
@@ -89,7 +92,10 @@ def train_discriminator(encoder, groups, n_target_samples=2, cuda=False, epochs=
             y_pred = discriminator(x_cat)
 
             # Label is the group
-            loss = -loss_fn(y_pred, Variable(torch.LongTensor([group])))
+            y = Variable(torch.LongTensor([group]))
+            if cuda:
+                y = y.cuda()
+            loss = -loss_fn(y_pred, y)
 
             loss.backward()
 
@@ -100,7 +106,7 @@ def train_discriminator(encoder, groups, n_target_samples=2, cuda=False, epochs=
     return discriminator
 
 ''' FADA Loss, as given by (4) in the paper. The minus sign is shifted because it seems to be wrong '''
-def fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true, gamma=0.5):
+def fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true, gamma=0.2):
     return -gamma * torch.mean(g1_true * torch.log(y_pred_g2) + g3_true * torch.log(y_pred_g4))
 
 ''' Step three of the algorithm, train everything except the DCD '''
