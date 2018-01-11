@@ -12,9 +12,10 @@ def model_fn(encoder, classifier):
     return lambda x: classifier(encoder(x))
 
 ''' Pretrain the encoder and classifier as in (a) in figure 2. '''
-def pretrain(epochs=5, cuda=False):
+def pretrain(data, epochs=5, batch_size=128, cuda=False):
 
-    train_dataloader = mnist_dataloader(cuda=cuda)
+    X_s, y_s, _, _ = data
+
     test_dataloader = mnist_dataloader(train=False, cuda=cuda)
 
     classifier = Classifier()
@@ -30,12 +31,11 @@ def pretrain(epochs=5, cuda=False):
     
     for e in range(epochs):
         
-        # TODO use only 2000 samples 
-        for x, y in train_dataloader:
-            
-            optimizer.zero_grad()
+        for _ in range(len(X_s) // batch_size):
+            inds = torch.randperm(len(X_s))[:batch_size]
 
-            x, y = Variable(x), Variable(y)
+            x, y = Variable(X_s[inds]), Variable(y_s[inds])
+            optimizer.zero_grad()
 
             if cuda:
                 x, y = x.cuda(), y.cuda()
@@ -101,8 +101,7 @@ def train_discriminator(encoder, groups, n_target_samples=2, cuda=False, epochs=
 
 ''' FADA Loss, as given by (4) in the paper. The minus sign is shifted because it seems to be wrong '''
 def fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true, gamma=0.5):
-    return -gamma * torch.mean(g1_true * torch.log(y_pred_g2) 
-        + g3_true * torch.log(y_pred_g4))
+    return -gamma * torch.mean(g1_true * torch.log(y_pred_g2) + g3_true * torch.log(y_pred_g4))
 
 ''' Step three of the algorithm, train everything except the DCD '''
 def train(encoder, discriminator, classifier, data, groups, n_target_samples=2, cuda=False, epochs=20, batch_size=256, plot_accuracy=False):
@@ -167,9 +166,7 @@ def train(encoder, discriminator, classifier, data, groups, n_target_samples=2, 
 
             # Evaluate loss
             # This is the full loss given by (5) in the paper
-            loss = fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true) 
-                + loss_fn(y_pred_s, y_s) 
-                + loss_fn(y_pred_t, y_t)
+            loss = fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true) + loss_fn(y_pred_s, y_s) + loss_fn(y_pred_t, y_t)
 
             loss.backward()
 
