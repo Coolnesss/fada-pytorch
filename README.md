@@ -6,8 +6,8 @@ Disclaimer: I'm not in any way affiliated with the authors. There might be error
 
 ### Todo
 
-* [x] Source-only training
-* [x] Freeze g and train DCD
-* [ ] Freeze the DCD and train g, h
-* [ ] Comprehensive tests
+* [x] Main algorithm implemented
+* [ ] Fix TODOs in code
+* [ ] Comprehensive tests 
 * [ ] More datasets to test on (currently only MNIST -> USPS)
+* [ ] The authors don't give the value of γ they used, one should be found via cross-validation

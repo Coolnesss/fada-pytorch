@@ -2,9 +2,9 @@ import torch
 from torch import nn
 from torch import optim
 from torch.autograd import Variable
-from data import mnist_dataloader, svhn_dataloader, sample_data, create_target_samples
+from data import mnist_dataloader, svhn_dataloader
 from models import Classifier, Encoder, DCD
-from util import eval_on_test
+from util import eval_on_test, into_tensor
 import random
 
 def model_fn(encoder, classifier):
@@ -51,51 +51,11 @@ def pretrain(epochs=5, cuda=False):
     
     return encoder, classifier
 
-''' 
-    Samples uniformly groups G1 and G3 from D_s x D_s and groups G2 and G4 from D_s x D_t  
-'''
-def create_groups(X_s, y_s, X_t, y_t):
-    n = X_t.shape[0]
-    G1, G3 = [], []
-    
-    # TODO optimize
-    # Groups G1 and G3 come from the source domain
-    for i, (x1, y1) in enumerate(zip(X_s, y_s)):
-        for j, (x2, y2) in enumerate(zip(X_s, y_s)):
-            if y1 == y2 and i != j and len(G1) < n:
-                G1.append((x1, x2))
-            if y1 != y2 and i != j and len(G3) < n:
-                G3.append((x1, x2))
-
-    G2, G4 = [], []
-
-    # Groups G2 and G4 are mixed from the source and target domains
-    for i, (x1, y1) in enumerate(zip(X_s, y_s)):
-        for j, (x2, y2) in enumerate(zip(X_t, y_t)):
-            if y1 == y2 and i != j and len(G2) < n:
-                G2.append((x1, x2))
-            if y1 != y2 and i != j and len(G4) < n:
-                G4.append((x1, x2))
-    
-    groups = [G1, G2, G3, G4]
-
-    # Make sure we sampled enough samples
-    for g in groups:
-        assert(len(g) == n)
-    return groups
-    
-
 ''' Train the discriminator while the encoder is frozen '''
-def train_discriminator(encoder, n_target_samples=2, cuda=False, epochs=20):
+def train_discriminator(encoder, groups, n_target_samples=2, cuda=False, epochs=20):
 
     source_loader = mnist_dataloader(train=True, cuda=cuda)
     target_loader = svhn_dataloader(train=True, cuda=cuda)
-
-    X_s, y_s = sample_data()
-    X_t, y_t = create_target_samples(n_target_samples)
-    
-    print("Sampling groups")
-    groups = create_groups(X_s, y_s, X_t, y_t)
 
     discriminator = DCD(D_in=128) # Takes in concatenated hidden representations
     loss_fn = nn.CrossEntropyLoss()
@@ -128,10 +88,76 @@ def train_discriminator(encoder, n_target_samples=2, cuda=False, epochs=20):
             y_pred = discriminator(x_cat)
 
             # Label is the group
-            loss = loss_fn(y_pred, Variable(torch.LongTensor([group])))
+            loss = -loss_fn(y_pred, Variable(torch.LongTensor([group])))
 
             loss.backward()
 
             optimizer.step()
 
         print("Epoch", e, "Loss", loss.data[0])
+    
+    return discriminator
+
+''' FADA Loss, as given by (4) in the paper. The minus sign is shifted because it seems to be wrong '''
+def fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true, gamma=0.2):
+    return -gamma * torch.mean(g1_true * torch.log(y_pred_g2) + g3_true * torch.log(y_pred_g4))
+
+''' Step three of the algorithm, train everything except the DCD '''
+def train(encoder, discriminator, classifier, data, groups, n_target_samples=2, cuda=False, epochs=20, batch_size=256):
+    
+    # For evaluation only
+    test_dataloader = svhn_dataloader(train=False, cuda=cuda)
+    
+    X_s, Y_s, X_t, Y_t = data
+
+    G1, G2, G3, G4 = groups
+
+    ''' Two optimizers, one for DCD (which is frozen) and one for class training ''' 
+    class_optimizer = optim.Adam(list(encoder.parameters()) + list(classifier.parameters()))
+    dcd_optimizer = optim.Adam(encoder.parameters())
+
+    loss_fn = nn.CrossEntropyLoss()
+    n_iters = 4 * n_target_samples
+    
+    for e in range(epochs):
+        
+        # TODO shuffle groups at each epoch
+
+        for _ in range(n_iters):
+            
+            class_optimizer.zero_grad()
+            dcd_optimizer.zero_grad()
+
+            # Evaluate source predictions
+            inds = torch.randperm(X_s.shape[0])[:batch_size]
+            x_s, y_s = Variable(X_s[inds]), Variable(Y_s[inds])
+
+            y_pred_s = model_fn(encoder, classifier)(x_s)
+            
+            # Evaluate target predictions
+            ind = random.randint(0, X_t.shape[0] - 1)
+            x_t, y_t = Variable(X_t[ind].unsqueeze(0)), Variable(torch.LongTensor([Y_t[ind]]))
+
+            y_pred_t = model_fn(encoder, classifier)(x_t)
+
+            # Evaluate groups 
+            x1, x2 = into_tensor(G2, into_vars=True)
+            x1, x2 = encoder(x1), encoder(x2)
+            y_pred_g2 = discriminator(torch.cat([x1, x2], 1))
+            g1_true = 1
+
+            x1, x2 = into_tensor(G4, into_vars=True)
+            x1, x2 = encoder(x1), encoder(x2)
+            y_pred_g4 = discriminator(torch.cat([x1, x2], 1))
+            g3_true = 3
+
+            # Evaluate loss
+            # This is the full loss given by (5) in the paper
+            loss = fada_loss(y_pred_g2, g1_true, y_pred_g4, g3_true) + loss_fn(y_pred_s, y_s) + loss_fn(y_pred_t, y_t)
+
+            loss.backward()
+
+            class_optimizer.step()
+
+        print("Epoch", e, "Loss", loss.data[0], "Accuracy", eval_on_test(test_dataloader, model_fn(encoder, classifier)))
+    

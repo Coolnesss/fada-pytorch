@@ -14,3 +14,9 @@ def eval_on_test(test_dataloader, model_fn):
             x, y = x.cuda(), y.cuda()
         acc += accuracy(model_fn(x), y)
     return round(acc / float(len(test_dataloader)), 3)
+
+''' Converts a list of (x, x) pairs into two Tensors ''' 
+def into_tensor(data, into_vars=True):
+    X1 = [x[0] for x in data]
+    X2 = [x[1] for x in data]
+    return Variable(torch.stack(X1)), Variable(torch.stack(X2))
