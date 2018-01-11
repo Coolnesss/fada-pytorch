@@ -19,4 +19,6 @@ def eval_on_test(test_dataloader, model_fn):
 def into_tensor(data, into_vars=True):
     X1 = [x[0] for x in data]
     X2 = [x[1] for x in data]
+    if torch.cuda.is_available():
+        return Variable(torch.stack(X1)).cuda(), Variable(torch.stack(X2)).cuda()
     return Variable(torch.stack(X1)), Variable(torch.stack(X2))
