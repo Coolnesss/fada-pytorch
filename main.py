@@ -12,6 +12,6 @@ if __name__ == '__main__':
     
     encoder, classifier = pretrain(data, cuda=cuda, epochs=20)
 
-    discriminator = train_discriminator(encoder, groups, n_target_samples=n_target_samples, epochs=50)
+    discriminator = train_discriminator(encoder, groups, n_target_samples=n_target_samples, epochs=50, cuda=cuda)
 
     train(encoder, discriminator, classifier, data, groups, n_target_samples=n_target_samples, cuda=cuda, epochs=150, plot_accuracy=plot_accuracy)

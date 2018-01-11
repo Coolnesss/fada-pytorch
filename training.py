@@ -92,7 +92,10 @@ def train_discriminator(encoder, groups, n_target_samples=2, cuda=False, epochs=
             y_pred = discriminator(x_cat)
 
             # Label is the group
-            loss = -loss_fn(y_pred, Variable(torch.LongTensor([group])))
+            y = Variable(torch.LongTensor([group]))
+            if cuda:
+                y = y.cuda()
+            loss = -loss_fn(y_pred, y)
 
             loss.backward()
 
@@ -138,6 +141,8 @@ def train(encoder, discriminator, classifier, data, groups, n_target_samples=2, 
         g4_one, g4_two = into_tensor(G4, into_vars=True)
 
         inds = torch.randperm(g2_one.shape[0])
+        if cuda:
+            inds = inds.cuda()
         g2_one, g2_two, g4_one, g4_two = g2_one[inds], g2_two[inds], g4_one[inds], g4_two[inds]
 
         for _ in range(n_iters):
@@ -148,12 +153,15 @@ def train(encoder, discriminator, classifier, data, groups, n_target_samples=2, 
             # Evaluate source predictions
             inds = torch.randperm(X_s.shape[0])[:batch_size]
             x_s, y_s = Variable(X_s[inds]), Variable(Y_s[inds])
-
+            if cuda:
+                x_s, y_s = x_s.cuda(), y_s.cuda()
             y_pred_s = model_fn(encoder, classifier)(x_s)
             
             # Evaluate target predictions
             ind = random.randint(0, X_t.shape[0] - 1)
             x_t, y_t = Variable(X_t[ind].unsqueeze(0)), Variable(torch.LongTensor([Y_t[ind]]))
+            if cuda:
+                x_t, y_t = x_t.cuda(), y_t.cuda()
 
             y_pred_t = model_fn(encoder, classifier)(x_t)
 
